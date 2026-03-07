@@ -1,6 +1,5 @@
 import fs from 'fs'
 import path from 'path'
-import { parse } from 'csv/sync'
 
 export interface BenchmarkData {
   OpType: string
@@ -28,21 +27,37 @@ export function loadBenchmarks(): BenchmarkData[] {
     const filePath = path.join(process.cwd(), 'public', 'data', 'print_industry_benchmarks.csv')
     const fileContent = fs.readFileSync(filePath, 'utf-8')
     
-    // Parse CSV, skipping comment lines
-    const lines = fileContent.split('\n').filter(line => !line?.startsWith('#') && line?.trim())
-    const csvContent = lines?.join('\n')
-    
-    const records = parse(csvContent, {
-      columns: true,
-      skip_empty_lines: true,
-      cast: (value, context) => {
-        // Convert numeric columns to numbers
-        if (context?.column !== 'OpType' && context?.column !== 'RevenueBand') {
-          return parseFloat(value || '0')
-        }
-        return value
-      },
+    // Parse CSV manually, skipping comment lines (lines starting with #) and empty lines
+    const lines = fileContent.split('\n').filter(line => {
+      const trimmed = line?.trim()
+      return trimmed && !trimmed.startsWith('#')
     })
+    
+    if (lines.length < 2) {
+      console.error('Benchmark file has insufficient data rows')
+      return []
+    }
+    
+    // First line is headers
+    const headers = lines[0].split(',').map(h => h.trim())
+    
+    // Parse data rows
+    const records: BenchmarkData[] = []
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim())
+      if (values.length >= headers.length) {
+        const record: any = {}
+        headers.forEach((header, idx) => {
+          if (header === 'OpType' || header === 'RevenueBand') {
+            record[header] = values[idx]
+          } else {
+            const parsed = parseFloat(values[idx] || '0')
+            record[header] = isNaN(parsed) ? 0 : parsed
+          }
+        })
+        records.push(record as BenchmarkData)
+      }
+    }
     
     cachedBenchmarks = records
     return records
