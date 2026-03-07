@@ -1,0 +1,178 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/print_assessment_agent/nextjs_space/node_modules/.prisma/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+// User model for authentication
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  assessments   Assessment[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Assessment models
+model Assessment {
+  id                String             @id @default(cuid())
+  sessionCode       String             @unique @default(cuid())
+  mode              String             // 'chat' or 'form'
+  status            String             @default("in_progress") // 'in_progress', 'completed'
+  
+  // Profile data
+  operationType     String?            // Digital, Offset, Wide Format, Hybrid
+  revenueBand       String?            // $1M-$5M, $5M-$10M, $10M-$25M, $25M+
+  numEmployees      Int?
+  primaryMarkets    String?
+  
+  // Scoring
+  overallScore      Float?
+  
+  createdById       String?
+  createdBy         User?              @relation(fields: [createdById], references: [id])
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  completedAt       DateTime?
+  
+  respondents       Respondent[]
+  responses         Response[]
+  sectionProgress   SectionProgress[]
+  result            AssessmentResult?
+  invitations       AssessmentInvitation[]
+}
+
+model Respondent {
+  id            String       @id @default(cuid())
+  assessmentId  String
+  assessment    Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  
+  name          String
+  email         String
+  role          String?      // Operations Manager, CFO, Sales Director, etc.
+  
+  createdAt     DateTime     @default(now())
+  
+  responses     Response[]
+  completedSections SectionProgress[]
+}
+
+model Response {
+  id            String       @id @default(cuid())
+  assessmentId  String
+  assessment    Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  
+  respondentId  String
+  respondent    Respondent   @relation(fields: [respondentId], references: [id], onDelete: Cascade)
+  
+  section       String       // profile, production, financial, technology, sales
+  questionKey   String
+  questionText  String
+  answerValue   String       // Store as string, parse as needed
+  answerType    String       // number, text, select, multiselect
+  
+  createdAt     DateTime     @default(now())
+  
+  @@index([assessmentId, section])
+}
+
+model SectionProgress {
+  id            String       @id @default(cuid())
+  assessmentId  String
+  assessment    Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  
+  section       String       // profile, production, financial, technology, sales
+  isCompleted   Boolean      @default(false)
+  
+  completedById String?
+  completedBy   Respondent?  @relation(fields: [completedById], references: [id])
+  completedAt   DateTime?
+  
+  @@unique([assessmentId, section])
+}
+
+model AssessmentResult {
+  id                        String       @id @default(cuid())
+  assessmentId              String       @unique
+  assessment                Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  
+  // Functional area scores
+  productionWorkflowScore   Float
+  financialVisibilityScore  Float
+  technologyGapScore        Float
+  salesServicePeopleScore   Float
+  overallScore              Float
+  
+  // Insights and recommendations
+  topInsights               String       // JSON string
+  costOpportunities         String       // JSON string
+  gapAnalysis               String       // JSON string
+  consultingRoadmap         String       // JSON string
+  
+  // PDF storage
+  pdfUrl                    String?
+  
+  createdAt                 DateTime     @default(now())
+}
+
+model AssessmentInvitation {
+  id            String       @id @default(cuid())
+  assessmentId  String
+  assessment    Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  
+  email         String
+  role          String
+  sections      String       // JSON array of sections to complete
+  
+  sentAt        DateTime     @default(now())
+  acceptedAt    DateTime?
+  
+  @@index([assessmentId])
+}
