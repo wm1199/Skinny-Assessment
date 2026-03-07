@@ -1,8 +1,21 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getBenchmark } from '@/lib/benchmark'
+import fs from 'fs'
+import path from 'path'
 
 export const dynamic = 'force-dynamic'
+
+// Load logo as base64
+function getLogoBase64(): string {
+  try {
+    const logoPath = path.join(process.cwd(), 'public', 'images', 'Gimbel_Logo.jpg')
+    const logoBuffer = fs.readFileSync(logoPath)
+    return `data:image/jpeg;base64,${logoBuffer.toString('base64')}`
+  } catch (e) {
+    return ''
+  }
+}
 
 // Helper: Circular progress ring
 function generateCircularProgress(score: number, size: number = 120, strokeWidth: number = 10): string {
@@ -185,6 +198,18 @@ export async function POST(
     }))
     const donutChart = donutSegments.length > 0 ? generateDonutChart(donutSegments, 100) : ''
 
+    // Get logo base64
+    const logoBase64 = getLogoBase64()
+    
+    // Format date
+    const reportDate = new Date().toLocaleDateString('en-US', { 
+      weekday: 'long',
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    })
+    const totalPages = 4
+
     // Generate HTML content for PDF - Letter size (8.5 x 11 inches)
     const htmlContent = `
 <!DOCTYPE html>
@@ -199,12 +224,21 @@ export async function POST(
     .page { width: 8.5in; height: 11in; padding: 0.4in; page-break-after: always; position: relative; overflow: hidden; }
     .page:last-child { page-break-after: auto; }
     
+    /* Logo styling */
+    .logo-img { height: 40px; width: auto; object-fit: contain; }
+    .logo-img-small { height: 28px; width: auto; object-fit: contain; }
+    
     /* Cover Page */
     .cover { background: linear-gradient(145deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%); color: white; }
-    .cover-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.25in; }
+    .cover-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.15in; }
     .brand { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
     .brand-sub { font-size: 9px; opacity: 0.8; margin-top: 2px; }
     .session-info { text-align: right; font-size: 9px; opacity: 0.7; }
+    
+    /* Executive Overview */
+    .exec-overview { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 14px 16px; margin-bottom: 0.15in; }
+    .exec-overview-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; color: #93c5fd; }
+    .exec-overview-text { font-size: 10px; line-height: 1.55; opacity: 0.92; }
     
     .cover-main { display: flex; gap: 0.3in; margin-top: 0.15in; }
     .cover-left { flex: 1; }
@@ -303,19 +337,34 @@ export async function POST(
   <!-- PAGE 1: EXECUTIVE SUMMARY COVER -->
   <div class="page cover">
     <div class="cover-header">
-      <div>
-        <div class="brand">Gimbel & Associates</div>
-        <div class="brand-sub">Commercial Print Industry Consulting</div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        ${logoBase64 ? `<img src="${logoBase64}" class="logo-img" alt="Gimbel & Associates" style="background: white; padding: 4px 8px; border-radius: 4px;" />` : `<div class="brand">Gimbel & Associates</div>`}
       </div>
       <div class="session-info">
-        Assessment ID: ${sessionCode}<br/>
-        ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+        <div style="font-size: 10px; font-weight: 600; margin-bottom: 2px;">${reportDate}</div>
+        Assessment ID: ${sessionCode}
+      </div>
+    </div>
+    
+    <!-- Executive Overview -->
+    <div class="exec-overview">
+      <div class="exec-overview-title">📋 Executive Overview</div>
+      <div class="exec-overview-text">
+        This <strong>Operational Assessment Report</strong> provides a comprehensive evaluation of your commercial print operation's 
+        performance across four critical business dimensions: Production Workflow, Financial Visibility, Technology Readiness, 
+        and Sales, Service & People. The analysis compares your organization's key metrics against proprietary industry benchmarks 
+        derived from hundreds of print operations in your revenue segment.
+        <br/><br/>
+        <strong>What to expect:</strong> You will find an overall performance score, detailed gap analysis identifying areas 
+        where you exceed or fall below industry standards, specific cost-saving opportunities with estimated ROI, and a 
+        prioritized roadmap of recommendations. Our methodology combines quantitative metric analysis with industry best practices 
+        to deliver actionable insights tailored to your operation's unique profile.
       </div>
     </div>
     
     <div class="cover-main">
       <div class="cover-left">
-        <div class="report-title">Operational Assessment Report</div>
+        <div class="report-title" style="font-size: 24px; margin-bottom: 0.08in;">Operational Assessment Report</div>
         <div class="report-context">
           <strong>${assessment?.operationType || 'Commercial Print'}</strong> operation in the <strong>${assessment?.revenueBand || '$5M-$10M'}</strong> revenue segment${assessment?.numEmployees ? ` with ${assessment.numEmployees} employees` : ''}.
         </div>
@@ -393,15 +442,17 @@ export async function POST(
     </div>
     
     <div class="footer" style="color: rgba(255,255,255,0.6); border-top-color: rgba(255,255,255,0.2);">
-      © ${new Date().getFullYear()} Gimbel & Associates | Confidential Assessment Report | Page 1
+      © ${new Date().getFullYear()} Gimbel & Associates | Confidential Assessment Report | Page 1 of ${totalPages}
     </div>
   </div>
   
   <!-- PAGE 2: DETAILED ANALYSIS -->
   <div class="page inner">
     <div class="inner-header">
-      <div class="inner-brand">Gimbel & Associates</div>
-      <div class="inner-meta">${sessionCode} | ${assessment?.operationType || 'Print Shop'}</div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        ${logoBase64 ? `<img src="${logoBase64}" class="logo-img-small" alt="Gimbel & Associates" />` : `<div class="inner-brand">Gimbel & Associates</div>`}
+      </div>
+      <div class="inner-meta">${reportDate}<br/>${sessionCode} | ${assessment?.operationType || 'Print Shop'}</div>
     </div>
     
     <div class="page-title">Performance Analysis & Gap Assessment</div>
@@ -470,15 +521,17 @@ export async function POST(
     </div>
     
     <div class="footer">
-      © ${new Date().getFullYear()} Gimbel & Associates | Assessment ID: ${sessionCode} | Page 2
+      © ${new Date().getFullYear()} Gimbel & Associates | Assessment ID: ${sessionCode} | Page 2 of ${totalPages}
     </div>
   </div>
   
   <!-- PAGE 3: OPPORTUNITIES & ROADMAP -->
   <div class="page inner">
     <div class="inner-header">
-      <div class="inner-brand">Gimbel & Associates</div>
-      <div class="inner-meta">${sessionCode} | ${assessment?.operationType || 'Print Shop'}</div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        ${logoBase64 ? `<img src="${logoBase64}" class="logo-img-small" alt="Gimbel & Associates" />` : `<div class="inner-brand">Gimbel & Associates</div>`}
+      </div>
+      <div class="inner-meta">${reportDate}<br/>${sessionCode} | ${assessment?.operationType || 'Print Shop'}</div>
     </div>
     
     <div class="page-title">Improvement Opportunities & Roadmap</div>
@@ -564,15 +617,17 @@ export async function POST(
     </div>
     
     <div class="footer">
-      © ${new Date().getFullYear()} Gimbel & Associates | Assessment ID: ${sessionCode} | Page 3
+      © ${new Date().getFullYear()} Gimbel & Associates | Assessment ID: ${sessionCode} | Page 3 of ${totalPages}
     </div>
   </div>
   
   <!-- PAGE 4: CONCLUSION & RECOMMENDATIONS -->
   <div class="page inner">
     <div class="inner-header">
-      <div class="inner-brand">Gimbel & Associates</div>
-      <div class="inner-meta">${sessionCode} | ${assessment?.operationType || 'Print Shop'}</div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        ${logoBase64 ? `<img src="${logoBase64}" class="logo-img-small" alt="Gimbel & Associates" />` : `<div class="inner-brand">Gimbel & Associates</div>`}
+      </div>
+      <div class="inner-meta">${reportDate}<br/>${sessionCode} | ${assessment?.operationType || 'Print Shop'}</div>
     </div>
     
     <div class="page-title">Conclusion & Recommendations</div>
@@ -828,7 +883,7 @@ export async function POST(
     </div>
     
     <div class="footer">
-      © ${new Date().getFullYear()} Gimbel & Associates | Confidential Assessment Report | Page 4
+      © ${new Date().getFullYear()} Gimbel & Associates | Confidential Assessment Report | Page 4 of ${totalPages}
     </div>
   </div>
 </body>
