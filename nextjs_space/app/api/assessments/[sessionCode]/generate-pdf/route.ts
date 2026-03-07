@@ -563,17 +563,272 @@ export async function POST(
       </div>
     </div>
     
-    <div class="contact-bar">
-      <div class="contact-cta">Ready to Transform Your Operation?</div>
-      <div class="contact-items">
-        <span>📧 consulting@gimbelassociates.com</span>
-        <span>📞 (555) 123-4567</span>
-        <span>🌐 gimbelassociates.com</span>
+    <div class="footer">
+      © ${new Date().getFullYear()} Gimbel & Associates | Assessment ID: ${sessionCode} | Page 3
+    </div>
+  </div>
+  
+  <!-- PAGE 4: CONCLUSION & RECOMMENDATIONS -->
+  <div class="page inner">
+    <div class="inner-header">
+      <div class="inner-brand">Gimbel & Associates</div>
+      <div class="inner-meta">${sessionCode} | ${assessment?.operationType || 'Print Shop'}</div>
+    </div>
+    
+    <div class="page-title">Conclusion & Recommendations</div>
+    
+    <!-- Executive Summary Box -->
+    <div style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 1px solid #0ea5e9; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+      <div style="font-size: 12px; font-weight: 700; color: #0369a1; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 16px;">📋</span> Assessment Summary
+      </div>
+      <div style="font-size: 10px; color: #475569; line-height: 1.6;">
+        Based on our comprehensive analysis of your <strong>${assessment?.operationType || 'commercial print'}</strong> operation 
+        in the <strong>${assessment?.revenueBand || '$5M-$10M'}</strong> revenue segment${assessment?.numEmployees ? ` with <strong>${assessment.numEmployees} employees</strong>` : ''}, 
+        your organization achieved an overall performance score of <strong style="color: ${scoreColor};">${overallScore}</strong> out of 100. 
+        This places your operation in the <strong style="color: ${scoreColor};">"${scoreStatus}"</strong> category compared to industry benchmarks. 
+        We identified <strong>${costOpportunities?.length || 0} cost-saving opportunities</strong> with potential annual savings of 
+        <strong style="color: #059669;">${totalSavings > 0 ? '$' + totalSavings.toLocaleString() : 'TBD'}</strong>, 
+        along with <strong>${gapAnalysis?.filter((g: any) => g.status === 'below').length || 0} areas requiring immediate attention</strong>.
+      </div>
+    </div>
+    
+    <div class="two-col" style="gap: 0.2in;">
+      <!-- Strengths Column -->
+      <div class="col">
+        <div style="background: linear-gradient(135deg, #ecfdf5, #d1fae5); border-left: 4px solid #10b981; border-radius: 8px; padding: 14px; height: 100%;">
+          <div style="font-size: 11px; font-weight: 700; color: #065f46; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 14px;">✓</span> Operational Strengths
+          </div>
+          ${(() => {
+            const strengths = gapAnalysis?.filter((g: any) => g.status === 'above') || []
+            const strongAreas = [
+              { area: 'Production', score: result?.productionWorkflowScore ?? 0 },
+              { area: 'Financial', score: result?.financialVisibilityScore ?? 0 },
+              { area: 'Technology', score: result?.technologyGapScore ?? 0 },
+              { area: 'Sales & People', score: result?.salesServicePeopleScore ?? 0 }
+            ].filter(a => a.score >= 60).sort((a, b) => b.score - a.score)
+            
+            if (strengths.length === 0 && strongAreas.length === 0) {
+              return `<div style="font-size: 10px; color: #475569; font-style: italic;">No metrics currently exceed benchmark thresholds. This presents a significant opportunity for comprehensive improvement across all areas.</div>`
+            }
+            
+            let html = ''
+            if (strongAreas.length > 0) {
+              html += `<div style="margin-bottom: 10px;">`
+              strongAreas.forEach(area => {
+                html += `
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    <div style="width: 6px; height: 6px; background: #10b981; border-radius: 50%;"></div>
+                    <span style="font-size: 10px; color: #065f46; font-weight: 600;">${area.area}:</span>
+                    <span style="font-size: 10px; color: #166534;">Score of ${area.score} demonstrates solid performance</span>
+                  </div>
+                `
+              })
+              html += `</div>`
+            }
+            
+            if (strengths.length > 0) {
+              html += `<div style="font-size: 9px; color: #047857; font-weight: 500; margin-bottom: 6px;">Metrics Above Benchmark:</div>`
+              strengths.slice(0, 4).forEach((s: any) => {
+                html += `
+                  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px; padding-left: 8px;">
+                    <span style="color: #10b981;">✓</span>
+                    <span style="font-size: 9px; color: #475569;">${s.metric}: ${s.yourValue?.toFixed(1)} (benchmark: ${s.benchmark?.toFixed(1)})</span>
+                  </div>
+                `
+              })
+            }
+            
+            return html
+          })()}
+        </div>
+      </div>
+      
+      <!-- Areas for Improvement Column -->
+      <div class="col">
+        <div style="background: linear-gradient(135deg, #fef2f2, #fee2e2); border-left: 4px solid #ef4444; border-radius: 8px; padding: 14px; height: 100%;">
+          <div style="font-size: 11px; font-weight: 700; color: #991b1b; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 14px;">⚠</span> Areas Requiring Attention
+          </div>
+          ${(() => {
+            const weaknesses = gapAnalysis?.filter((g: any) => g.status === 'below') || []
+            const weakAreas = [
+              { area: 'Production', score: result?.productionWorkflowScore ?? 0 },
+              { area: 'Financial', score: result?.financialVisibilityScore ?? 0 },
+              { area: 'Technology', score: result?.technologyGapScore ?? 0 },
+              { area: 'Sales & People', score: result?.salesServicePeopleScore ?? 0 }
+            ].filter(a => a.score < 60).sort((a, b) => a.score - b.score)
+            
+            let html = ''
+            if (weakAreas.length > 0) {
+              html += `<div style="margin-bottom: 10px;">`
+              weakAreas.forEach(area => {
+                const urgency = area.score < 40 ? 'Critical' : 'Moderate'
+                const urgColor = area.score < 40 ? '#dc2626' : '#f59e0b'
+                html += `
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    <div style="width: 6px; height: 6px; background: ${urgColor}; border-radius: 50%;"></div>
+                    <span style="font-size: 10px; color: #991b1b; font-weight: 600;">${area.area}:</span>
+                    <span style="font-size: 10px; color: #7f1d1d;">Score of ${area.score} - <em style="color: ${urgColor};">${urgency} priority</em></span>
+                  </div>
+                `
+              })
+              html += `</div>`
+            }
+            
+            if (weaknesses.length > 0) {
+              html += `<div style="font-size: 9px; color: #b91c1c; font-weight: 500; margin-bottom: 6px;">Metrics Below Benchmark:</div>`
+              weaknesses.slice(0, 4).forEach((w: any) => {
+                const gap = ((w.benchmark - w.yourValue) / w.benchmark * 100).toFixed(0)
+                html += `
+                  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px; padding-left: 8px;">
+                    <span style="color: #ef4444;">✗</span>
+                    <span style="font-size: 9px; color: #475569;">${w.metric}: ${w.yourValue?.toFixed(1)} vs ${w.benchmark?.toFixed(1)} (${gap}% gap)</span>
+                  </div>
+                `
+              })
+            }
+            
+            if (weaknesses.length === 0 && weakAreas.length === 0) {
+              html = `<div style="font-size: 10px; color: #475569; font-style: italic;">All measured metrics meet or exceed benchmarks. Focus should be on maintaining current performance and pursuing excellence initiatives.</div>`
+            }
+            
+            return html
+          })()}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Specific Recommendations -->
+    <div style="background: #fafafa; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-top: 16px;">
+      <div style="font-size: 12px; font-weight: 700; color: #1e40af; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 16px;">💡</span> Tailored Recommendations
+      </div>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        ${(() => {
+          const recommendations = []
+          const prodScore = result?.productionWorkflowScore ?? 0
+          const finScore = result?.financialVisibilityScore ?? 0
+          const techScore = result?.technologyGapScore ?? 0
+          const salesScore = result?.salesServicePeopleScore ?? 0
+          
+          // Production recommendations
+          if (prodScore < 60) {
+            recommendations.push({
+              priority: prodScore < 40 ? 'High' : 'Medium',
+              area: 'Production Efficiency',
+              recommendation: 'Implement lean manufacturing principles, standardize workflows, and consider automated scheduling systems to reduce labor costs and material waste.',
+              color: prodScore < 40 ? '#dc2626' : '#f59e0b'
+            })
+          }
+          
+          // Financial recommendations
+          if (finScore < 60) {
+            recommendations.push({
+              priority: finScore < 40 ? 'High' : 'Medium',
+              area: 'Financial Controls',
+              recommendation: 'Deploy job costing systems, implement real-time margin tracking, and establish weekly financial review processes to improve visibility and profitability.',
+              color: finScore < 40 ? '#dc2626' : '#f59e0b'
+            })
+          }
+          
+          // Technology recommendations
+          if (techScore < 60) {
+            recommendations.push({
+              priority: techScore < 40 ? 'High' : 'Medium',
+              area: 'Technology Modernization',
+              recommendation: 'Evaluate modern MIS/ERP solutions, automate manual processes, and integrate digital workflows to reduce errors and improve throughput.',
+              color: techScore < 40 ? '#dc2626' : '#f59e0b'
+            })
+          }
+          
+          // Sales & People recommendations
+          if (salesScore < 60) {
+            recommendations.push({
+              priority: salesScore < 40 ? 'High' : 'Medium',
+              area: 'People & Growth',
+              recommendation: 'Invest in employee retention programs, implement CRM systems for customer relationship management, and develop structured sales training initiatives.',
+              color: salesScore < 40 ? '#dc2626' : '#f59e0b'
+            })
+          }
+          
+          // If all areas are doing well
+          if (recommendations.length === 0) {
+            recommendations.push({
+              priority: 'Low',
+              area: 'Continuous Excellence',
+              recommendation: 'Focus on maintaining competitive advantages, exploring advanced analytics, and pursuing industry leadership through innovation.',
+              color: '#16a34a'
+            })
+            recommendations.push({
+              priority: 'Low',
+              area: 'Strategic Growth',
+              recommendation: 'Consider expansion opportunities, evaluate new market segments, and invest in cutting-edge technology to stay ahead of competitors.',
+              color: '#16a34a'
+            })
+          }
+          
+          return recommendations.slice(0, 4).map(rec => `
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-size: 10px; font-weight: 600; color: #1e293b;">${rec.area}</span>
+                <span style="font-size: 8px; padding: 2px 8px; background: ${rec.color}; color: white; border-radius: 10px;">${rec.priority} Priority</span>
+              </div>
+              <div style="font-size: 9px; color: #64748b; line-height: 1.5;">${rec.recommendation}</div>
+            </div>
+          `).join('')
+        })()}
+      </div>
+    </div>
+    
+    <!-- Gimbel & Associates Services CTA -->
+    <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%); border-radius: 12px; padding: 20px; margin-top: 16px; color: white;">
+      <div style="display: flex; gap: 20px; align-items: stretch;">
+        <div style="flex: 1.3;">
+          <div style="font-size: 14px; font-weight: 700; margin-bottom: 8px;">Partner with Gimbel & Associates</div>
+          <div style="font-size: 10px; opacity: 0.95; line-height: 1.6; margin-bottom: 12px;">
+            Our team of industry specialists has helped hundreds of print operations transform their businesses. 
+            With over 30 years of combined experience in commercial printing, we offer hands-on consulting that delivers 
+            measurable results. Let us help you turn these insights into action.
+          </div>
+          <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 9px;">
+              <span>✓</span> Operational Audits
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 9px;">
+              <span>✓</span> Technology Selection
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 9px;">
+              <span>✓</span> Process Optimization
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 9px;">
+              <span>✓</span> Change Management
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 9px;">
+              <span>✓</span> Training Programs
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 9px;">
+              <span>✓</span> ROI Analysis
+            </div>
+          </div>
+        </div>
+        <div style="width: 1px; background: rgba(255,255,255,0.3);"></div>
+        <div style="flex: 0.7; display: flex; flex-direction: column; justify-content: center;">
+          <div style="font-size: 10px; font-weight: 600; margin-bottom: 10px; opacity: 0.9;">Schedule a Consultation</div>
+          <div style="font-size: 9px; margin-bottom: 4px;">📧 consulting@gimbelassociates.com</div>
+          <div style="font-size: 9px; margin-bottom: 4px;">📞 (555) 123-4567</div>
+          <div style="font-size: 9px; margin-bottom: 8px;">🌐 www.gimbelassociates.com</div>
+          <div style="background: white; color: #1e40af; padding: 6px 14px; border-radius: 20px; font-size: 9px; font-weight: 600; text-align: center; display: inline-block;">
+            Request Free Strategy Session
+          </div>
+        </div>
       </div>
     </div>
     
     <div class="footer">
-      © ${new Date().getFullYear()} Gimbel & Associates | This report contains proprietary analysis. | Page 3
+      © ${new Date().getFullYear()} Gimbel & Associates | Confidential Assessment Report | Page 4
     </div>
   </div>
 </body>
