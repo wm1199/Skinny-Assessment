@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Send, Loader2, Bot, User } from 'lucide-react'
+import { Send, Loader2, Bot, User, Download, FileText, CheckCircle } from 'lucide-react'
 import { AssessmentHeader } from '@/components/assessment-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,40 @@ import { useToast } from '@/hooks/use-toast'
 interface Message {
   role: 'user' | 'assistant'
   content: string
+}
+
+// Detect if the AI offered to generate report and user agreed
+function shouldTriggerReportGeneration(messages: Message[]): boolean {
+  if (messages.length < 4) return false
+  
+  const lastMessages = messages.slice(-4)
+  
+  // Look for AI offering report generation
+  const aiOfferedReport = lastMessages.some(
+    (m) =>
+      m.role === 'assistant' &&
+      (m.content.toLowerCase().includes('generate') ||
+        m.content.toLowerCase().includes('scorecard') ||
+        m.content.toLowerCase().includes('report')) &&
+      (m.content.toLowerCase().includes('would you like') ||
+        m.content.toLowerCase().includes('shall i') ||
+        m.content.toLowerCase().includes('ready to'))
+  )
+  
+  if (!aiOfferedReport) return false
+  
+  // Check if user's most recent message is affirmative
+  const lastUserMessage = messages.filter((m) => m.role === 'user').pop()
+  if (!lastUserMessage) return false
+  
+  const affirmativeResponses = [
+    'yes', 'yeah', 'yep', 'sure', 'ok', 'okay', 'please', 'go ahead',
+    'sounds good', 'let\'s do it', 'generate', 'create', 'make it',
+    'absolutely', 'definitely', 'of course', 'do it', 'proceed'
+  ]
+  
+  const userText = lastUserMessage.content.toLowerCase().trim()
+  return affirmativeResponses.some((phrase) => userText.includes(phrase))
 }
 
 export default function ChatAssessment({ params }: { params: { sessionCode: string } }) {
@@ -26,6 +60,9 @@ export default function ChatAssessment({ params }: { params: { sessionCode: stri
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false)
+  const [reportReady, setReportReady] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -37,9 +74,115 @@ export default function ChatAssessment({ params }: { params: { sessionCode: stri
     messagesEndRef?.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Check if we should generate report after messages update
+  useEffect(() => {
+    if (!isLoading && !reportReady && !isGeneratingReport && messages.length > 4) {
+      if (shouldTriggerReportGeneration(messages)) {
+        generateReport()
+      }
+    }
+  }, [messages, isLoading])
+
+  const generateReport = async () => {
+    setIsGeneratingReport(true)
+    
+    // Add a system message
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'assistant',
+        content: '📊 Generating your assessment report... I\'m analyzing your responses and calculating scores against industry benchmarks.',
+      },
+    ])
+
+    try {
+      const response = await fetch('/api/chat/extract-and-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionCode, messages }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate report')
+      }
+
+      const result = await response.json()
+
+      // Update with completion message
+      setMessages(prev => {
+        const newMessages = [...prev]
+        newMessages[newMessages.length - 1] = {
+          role: 'assistant',
+          content: `✅ **Your assessment report is ready!**\n\n**Overall Score: ${result.scores.overall}**\n\n• Production Workflow: ${result.scores.production}\n• Financial Visibility: ${result.scores.financial}\n• Technology Gap: ${result.scores.technology}\n• Sales & People: ${result.scores.sales}\n\nClick the "Download Report" button below to get your complete PDF scorecard with detailed insights, benchmarks, and recommendations.`,
+        }
+        return newMessages
+      })
+
+      setReportReady(true)
+      toast({
+        title: 'Report Ready!',
+        description: 'Your assessment report has been generated.',
+      })
+    } catch (error) {
+      console.error('Error generating report:', error)
+      setMessages(prev => {
+        const newMessages = [...prev]
+        newMessages[newMessages.length - 1] = {
+          role: 'assistant',
+          content: 'I encountered an issue generating your report. Please try again or use the structured form for a more reliable assessment.',
+        }
+        return newMessages
+      })
+      toast({
+        title: 'Error',
+        description: 'Failed to generate report. Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsGeneratingReport(false)
+    }
+  }
+
+  const handleDownloadPDF = async () => {
+    setIsDownloading(true)
+    try {
+      const response = await fetch(`/api/assessments/${sessionCode}/generate-pdf`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF')
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `assessment-${sessionCode}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      toast({
+        title: 'Download Started',
+        description: 'Your PDF report is downloading.',
+      })
+    } catch (error) {
+      console.error('Error downloading PDF:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to download PDF. Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input?.trim() || isLoading) return
+    if (!input?.trim() || isLoading || isGeneratingReport) return
 
     const userMessage = input?.trim()
     setInput('')
@@ -161,27 +304,88 @@ export default function ChatAssessment({ params }: { params: { sessionCode: stri
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Report Ready Banner */}
+          {reportReady && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="border-t bg-gradient-to-r from-green-50 to-emerald-50 p-4"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-green-800">Assessment Complete!</p>
+                    <p className="text-sm text-green-600">Your PDF report is ready to download</p>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleDownloadPDF}
+                  disabled={isDownloading}
+                  className="bg-green-600 hover:bg-green-700 text-white gap-2"
+                >
+                  {isDownloading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Generating PDF...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Download Report
+                    </>
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
           {/* Input */}
           <div className="border-t p-4">
-            <form onSubmit={handleSubmit} className="flex space-x-2">
-              <Input
-                value={input}
-                onChange={(e) => setInput(e?.target?.value)}
-                placeholder="Type your response..."
-                disabled={isLoading}
-                className="flex-1"
-              />
-              <Button
-                type="submit"
-                disabled={isLoading || !input?.trim()}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Send className="w-5 h-5" />
-              </Button>
-            </form>
-            <p className="text-xs text-slate-500 mt-2">
-              Complete the assessment conversation to generate your scorecard
-            </p>
+            {!reportReady ? (
+              <>
+                <form onSubmit={handleSubmit} className="flex space-x-2">
+                  <Input
+                    value={input}
+                    onChange={(e) => setInput(e?.target?.value)}
+                    placeholder="Type your response..."
+                    disabled={isLoading || isGeneratingReport}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={isLoading || isGeneratingReport || !input?.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {isGeneratingReport ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Send className="w-5 h-5" />
+                    )}
+                  </Button>
+                </form>
+                <p className="text-xs text-slate-500 mt-2">
+                  {isGeneratingReport
+                    ? 'Generating your assessment report...'
+                    : 'Complete the assessment conversation to generate your scorecard'}
+                </p>
+              </>
+            ) : (
+              <div className="text-center">
+                <p className="text-sm text-slate-600">
+                  Thank you for completing the assessment! You can also{' '}
+                  <button
+                    onClick={() => router.push(`/assessment/${sessionCode}/results`)}
+                    className="text-blue-600 hover:underline font-medium"
+                  >
+                    view your results online
+                  </button>
+                  .
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </main>
